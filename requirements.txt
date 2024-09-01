@@ -1,0 +1,4 @@
+flask
+yt-dlp
+deepgram-sdk==2.*
+gunicorn
