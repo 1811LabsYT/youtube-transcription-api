@@ -7,7 +7,8 @@ import asyncio
 app = Flask(__name__)
 
 # Make sure to set this environment variable
-DEEPGRAM_API_KEY = os.environ.get('DEEPGRAM_API_KEY')
+# DEEPGRAM_API_KEY = os.environ.get('DEEPGRAM_API_KEY')
+DEEPGRAM_API_KEY = "25dfe638f80278d7bb1683907998959efdf801db"
 
 
 def get_cookies():
