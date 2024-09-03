@@ -51,7 +51,7 @@ def download_video(url):
         return audio_file
 
 
-def process_video_and_transcribe(video_url, callback_url):
+def process_video_and_transcribe(video_url, callback_url, note_id):
     try:
         audio_file = download_video(video_url)
 
@@ -63,12 +63,13 @@ def process_video_and_transcribe(video_url, callback_url):
             os.remove(audio_file)
 
             # Send the transcript to the callback URL
-            requests.post(callback_url, json={"transcript": transcript})
+            requests.post(callback_url, json={
+                          "note_id": note_id, "transcript": transcript})
         else:
             requests.post(callback_url, json={
-                          "error": "Failed to download audio"})
+                          "note_id": note_id, "error": "Failed to download audio"})
     except Exception as e:
-        requests.post(callback_url, json={"error": str(e)})
+        requests.post(callback_url, json={"note_id": note_id, "error": str(e)})
 
 
 @app.route('/', methods=['GET'])
@@ -81,13 +82,14 @@ def transcribe():
     data = request.json
     video_url = data.get('url')
     callback_url = data.get('callbackUrl')
+    note_id = data.get('noteId')
 
     if not video_url or not callback_url:
         return jsonify({"error": "Missing 'url' or 'callbackUrl' in request body"}), 400
 
     # Start the background process
     threading.Thread(target=process_video_and_transcribe,
-                     args=(video_url, callback_url)).start()
+                     args=(video_url, callback_url, note_id)).start()
 
     return jsonify({"message": "Transcription process started. Results will be sent to the callback URL."}), 202
 
