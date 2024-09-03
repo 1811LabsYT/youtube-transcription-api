@@ -3,6 +3,7 @@ import yt_dlp
 import os
 from deepgram import Deepgram
 import asyncio
+import requests
 
 app = Flask(__name__)
 
@@ -12,11 +13,22 @@ DEEPGRAM_API_KEY = "25dfe638f80278d7bb1683907998959efdf801db"
 
 
 def get_cookies():
-    cookie_file = 'cookies.txt'
-    if not os.path.exists(cookie_file):
-        raise FileNotFoundError(
-            f"Cookie file '{cookie_file}' not found. Please create it with your YouTube cookies.")
-    return cookie_file
+    # cookie_file = 'cookies.txt'
+    # if not os.path.exists(cookie_file):
+    #     raise FileNotFoundError(
+    #         f"Cookie file '{cookie_file}' not found. Please create it with your YouTube cookies.")
+    # return cookie_file
+    url = "https://wyccrwewjrdertucxipz.supabase.co/rest/v1/youtube-cookies"
+
+    payload = {}
+    headers = {
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5Y2Nyd2V3anJkZXJ0dWN4aXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTM2MDgwMDIsImV4cCI6MjAyOTE4NDAwMn0.FLEZyScF0zvEwG6vgE3Qo1vO6PIvADqtWIVzXswz2Uo',
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5Y2Nyd2V3anJkZXJ0dWN4aXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTM2MDgwMDIsImV4cCI6MjAyOTE4NDAwMn0.FLEZyScF0zvEwG6vgE3Qo1vO6PIvADqtWIVzXswz2Uo'
+    }
+
+    response = requests.request("GET", url, headers=headers, data=payload)
+
+    return response.text
 
 
 async def transcribe_audio(audio_file):
@@ -30,7 +42,7 @@ async def transcribe_audio(audio_file):
 
 
 def download_video(url):
-    cookie_file = get_cookies()
+    cookie = get_cookies()
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -39,7 +51,7 @@ def download_video(url):
             'preferredquality': '192',
         }],
         'outtmpl': '%(title)s.%(ext)s',
-        'cookiefile': cookie_file,
+        'cookiefile': cookie,
         'verbose': True,
     }
 
@@ -58,25 +70,34 @@ def home():
 def transcribe():
     data = request.json
     video_url = data.get('url')
+    callbackUrl = data.get('callbackUrl')
 
     if not video_url:
         return jsonify({"error": "Missing 'url' in request body"}), 400
 
-    try:
-        audio_file = download_video(video_url)
+    async def process_transcription():
+        try:
+            audio_file = download_video(video_url)
 
-        if audio_file and os.path.exists(audio_file):
-            transcription = asyncio.run(transcribe_audio(audio_file))
-            transcript = transcription['results']['channels'][0]['alternatives'][0]['transcript']
+            if audio_file and os.path.exists(audio_file):
+                transcription = await transcribe_audio(audio_file)
+                transcript = transcription['results']['channels'][0]['alternatives'][0]['transcript']
 
-            # Delete the audio file
-            os.remove(audio_file)
+                # Send the transcript to the callback URL
+                requests.post(callbackUrl, json={"transcript": transcript})
 
-            return jsonify({"transcript": transcript})
-        else:
-            return jsonify({"error": "Failed to download audio"}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+                # Delete the audio file
+                os.remove(audio_file)
+            else:
+                requests.post(callbackUrl, json={
+                              "error": "Failed to download audio"})
+        except Exception as e:
+            requests.post(callbackUrl, json={"error": str(e)})
+
+    # Trigger the background task
+    asyncio.create_task(process_transcription())
+
+    return jsonify({"message": "Transcription process started."}), 202
 
 
 if __name__ == '__main__':
