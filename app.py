@@ -57,14 +57,15 @@ def process_video_and_transcribe(video_url, callback_url, note_id):
 
         if audio_file and os.path.exists(audio_file):
             transcription = asyncio.run(transcribe_audio(audio_file))
-            transcript = transcription['results']['channels'][0]['alternatives'][0]['transcript']
+            results = transcription['results']
+            transcript = results['channels'][0]['alternatives'][0]['transcript']
 
             # Delete the audio file
             os.remove(audio_file)
 
             # Send the transcript to the callback URL
             requests.post(callback_url, json={
-                          "note_id": note_id, "transcript": transcript})
+                          "note_id": note_id, "transcript": transcript, "diarization": results})
         else:
             requests.post(callback_url, json={
                           "note_id": note_id, "error": "Failed to download audio"})
