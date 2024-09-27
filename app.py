@@ -83,7 +83,7 @@ def get_yt_dlp_transcript(info):
         return subtitle_data
 
 
-def process_video_and_transcribe(video_url, callback_url, note_id):
+def process_video_and_transcribe(video_url, note_id, callback_url=None):
     try:
         print(f'Getting transcription for {video_url}')
 
@@ -92,6 +92,7 @@ def process_video_and_transcribe(video_url, callback_url, note_id):
         if audio_file and os.path.exists(audio_file):
             transcription = asyncio.run(transcribe_audio(audio_file))
             transcript = transcription['transcript']
+            diarization = transcription['diarization']
 
             results = None
 
@@ -125,17 +126,26 @@ def process_video_and_transcribe(video_url, callback_url, note_id):
             transcription_data = {
                 "note_id": note_id,
                 "transcript": transcript,
-                "diarization": transcription['diarization'],
+                "diarization": diarization,
                 "results": results
             }
-            # Send the transcript to the callback URL
-            requests.post(callback_url, json=transcription_data)
+
+            if callback_url:
+                # Send the transcript to the callback URL
+                requests.post(callback_url, json=transcription_data)
+            else:
+                return transcription_data
+
         else:
-            requests.post(callback_url, json={
-                          "note_id": note_id, "error": "Failed to download audio"})
+            raise Exception("Failed to download audio")
+
     except Exception as e:
         print(e)
-        requests.post(callback_url, json={"note_id": note_id, "error": str(e)})
+        error_data = {"note_id": note_id, "error": str(e)}
+        if callback_url:
+            requests.post(callback_url, json=error_data)
+        else:
+            return error_data
 
 
 @app.route('/', methods=['GET'])
@@ -150,14 +160,18 @@ def transcribe():
     callback_url = data.get('callbackUrl')
     note_id = data.get('noteId')
 
-    if not video_url or not callback_url:
-        return jsonify({"error": "Missing 'url' or 'callbackUrl' in request body"}), 400
+    if not video_url:
+        return jsonify({"error": "Missing 'url' in request body"}), 400
 
-    # Start the background process
-    threading.Thread(target=process_video_and_transcribe,
-                     args=(video_url, callback_url, note_id)).start()
-
-    return jsonify({"message": "Transcription process started. Results will be sent to the callback URL."}), 202
+    if callback_url:
+        # Start the background process
+        threading.Thread(target=process_video_and_transcribe,
+                         args=(video_url, note_id, callback_url)).start()
+        return jsonify({"message": "Transcription process started. Results will be sent to the callback URL."}), 202
+    else:
+        # Process synchronously and return the result
+        result = process_video_and_transcribe(video_url, note_id)
+        return jsonify(result), 200
 
 
 if __name__ == '__main__':
