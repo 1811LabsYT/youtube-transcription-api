@@ -93,6 +93,8 @@ def process_video_and_transcribe(video_url, callback_url, note_id):
             transcription = asyncio.run(transcribe_audio(audio_file))
             transcript = transcription['transcript']
 
+            results = None
+
             # Check if Deepgram transcription is empty
             if not transcript.strip():
                 print(f'Transcript not found from deepgram for {video_url}')
@@ -100,7 +102,6 @@ def process_video_and_transcribe(video_url, callback_url, note_id):
                 # Fallback to yt-dlp transcription
                 transcription = get_yt_dlp_transcript(info)
 
-                results = None
                 if transcription:
                     results = json.loads(transcription)['events']
 
