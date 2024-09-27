@@ -34,9 +34,9 @@ async def transcribe_audio(audio_file):
         results = response['results']
         transcript = results['channels'][0]['alternatives'][0]['transcript']
 
-        return {"results": results, "transcript": transcript}
+        return {"diarization": results, "transcript": transcript}
     except:
-        return {"transcript": ''}
+        return {"diarization": None, "transcript": ''}
 
 
 def download_video(url):
@@ -100,6 +100,7 @@ def process_video_and_transcribe(video_url, callback_url, note_id):
                 # Fallback to yt-dlp transcription
                 transcription = get_yt_dlp_transcript(info)
 
+                results = None
                 if transcription:
                     results = json.loads(transcription)['events']
 
@@ -116,15 +117,18 @@ def process_video_and_transcribe(video_url, callback_url, note_id):
                 else:
                     raise Exception(
                         "Both Deepgram and yt-dlp failed to provide transcription")
-            else:
-                results = transcription['results']
 
             # Delete the audio file
             os.remove(audio_file)
 
+            transcription_data = {
+                "note_id": note_id,
+                "transcript": transcript,
+                "diarization": transcription['diarization'],
+                "results": results
+            }
             # Send the transcript to the callback URL
-            requests.post(callback_url, json={
-                          "note_id": note_id, "transcript": transcript, "diarization": results})
+            requests.post(callback_url, json=transcription_data)
         else:
             requests.post(callback_url, json={
                           "note_id": note_id, "error": "Failed to download audio"})
