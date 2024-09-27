@@ -31,10 +31,9 @@ async def transcribe_audio(audio_file):
             source = {'buffer': audio, 'mimetype': 'audio/mp3'}
             response = await deepgram.transcription.prerecorded(source, {'detect_language': True})
 
-        results = response['results']
-        transcript = results['channels'][0]['alternatives'][0]['transcript']
+        transcript = response['results']['channels'][0]['alternatives'][0]['transcript']
 
-        return {"diarization": results, "transcript": transcript}
+        return {"diarization": response, "transcript": transcript}
     except:
         return {"diarization": None, "transcript": ''}
 
@@ -71,16 +70,16 @@ def get_yt_dlp_transcript(info):
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         if 'subtitles' in info and info['subtitles']:
-            subtitle_lang = next(iter(info['subtitles']))
-            subtitle_url = info['subtitles'][subtitle_lang][0]['url']
+            language = next(iter(info['subtitles']))
+            subtitle_url = info['subtitles'][language][0]['url']
         elif 'automatic_captions' in info and 'en' in info['automatic_captions']:
-            subtitle_lang = next(iter(info['automatic_captions']))
-            subtitle_url = info['automatic_captions'][subtitle_lang][0]['url']
+            language = next(iter(info['automatic_captions']))
+            subtitle_url = info['automatic_captions'][language][0]['url']
         else:
             return None
 
         subtitle_data = ydl.urlopen(subtitle_url).read().decode('utf-8')
-        return subtitle_data
+        return subtitle_data, language
 
 
 def process_video_and_transcribe(video_url, note_id, callback_url=None):
@@ -95,16 +94,18 @@ def process_video_and_transcribe(video_url, note_id, callback_url=None):
             diarization = transcription['diarization']
 
             results = None
+            detected_language = None
 
             # Check if Deepgram transcription is empty
             if not transcript.strip():
                 print(f'Transcript not found from deepgram for {video_url}')
 
                 # Fallback to yt-dlp transcription
-                transcription = get_yt_dlp_transcript(info)
+                transcription, language = get_yt_dlp_transcript(info)
 
                 if transcription:
                     results = json.loads(transcription)['events']
+                    detected_language = language
 
                     utf8_strings = []
                     for event in results:
@@ -127,7 +128,8 @@ def process_video_and_transcribe(video_url, note_id, callback_url=None):
                 "note_id": note_id,
                 "transcript": transcript,
                 "diarization": diarization,
-                "results": results
+                "results": results,
+                "language": detected_language
             }
 
             if callback_url:
