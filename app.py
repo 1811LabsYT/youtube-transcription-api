@@ -23,13 +23,27 @@ def get_cookies():
     return cookie_file
 
 
-async def transcribe_audio(audio_file):
+async def transcribe_audio(audio_file, language):
     try:
         deepgram = Deepgram(DEEPGRAM_API_KEY)
 
         with open(audio_file, 'rb') as audio:
+            is_language_autodetect = not language or language == 'autodetect'
+
             source = {'buffer': audio, 'mimetype': 'audio/mp3'}
-            response = await deepgram.transcription.prerecorded(source, {'detect_language': True})
+            options = {
+                'model': 'nova-2',
+                'smart_format': True,
+                'diarize': True,
+                'punctuate': True,
+                'paragraphs': True,
+            }
+            if is_language_autodetect:
+                options['detect_language'] = True
+            else:
+                options['language'] = language
+
+            response = await deepgram.transcription.prerecorded(source, options)
 
         transcript = response['results']['channels'][0]['alternatives'][0]['transcript']
 
@@ -82,14 +96,14 @@ def get_yt_dlp_transcript(info):
         return subtitle_data, language
 
 
-def process_video_and_transcribe(video_url, note_id, callback_url=None):
+def process_video_and_transcribe(video_url, note_id, language, callback_url=None):
     try:
         print(f'Getting transcription for {video_url}')
 
         audio_file, info = download_video(video_url)
 
         if audio_file and os.path.exists(audio_file):
-            transcription = asyncio.run(transcribe_audio(audio_file))
+            transcription = asyncio.run(transcribe_audio(audio_file, language))
             transcript = transcription['transcript']
             diarization = transcription['diarization']
 
@@ -161,6 +175,7 @@ def transcribe():
     video_url = data.get('url')
     callback_url = data.get('callbackUrl')
     note_id = data.get('noteId')
+    language = data.get('language')
 
     if not video_url:
         return jsonify({"error": "Missing 'url' in request body"}), 400
@@ -168,11 +183,11 @@ def transcribe():
     if callback_url:
         # Start the background process
         threading.Thread(target=process_video_and_transcribe,
-                         args=(video_url, note_id, callback_url)).start()
+                         args=(video_url, note_id, language, callback_url)).start()
         return jsonify({"message": "Transcription process started. Results will be sent to the callback URL."}), 202
     else:
         # Process synchronously and return the result
-        result = process_video_and_transcribe(video_url, note_id)
+        result = process_video_and_transcribe(video_url, note_id, language)
         return jsonify(result), 200
 
 
