@@ -147,7 +147,8 @@ def process_video_and_transcribe(video_url, note_id, language, callback_url=None
             }
 
             if callback_url:
-                # Send the transcript to the callback URL
+                # Send the transcript to the callback URL with stringified diarization
+                transcription_data["diarization"] = json.dumps(diarization)
                 requests.post(callback_url, json=transcription_data)
             else:
                 return transcription_data
