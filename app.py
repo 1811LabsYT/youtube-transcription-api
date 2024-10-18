@@ -45,11 +45,9 @@ async def transcribe_audio(audio_file, language):
 
             response = await deepgram.transcription.prerecorded(source, options)
 
-        alternative = response['results']['channels'][0]['alternatives'][0]
-        transcript = alternative['transcript']
-        diarization = alternative['paragraphs']['paragraphs']
+        transcript = response['results']['channels'][0]['alternatives'][0]['transcript']
 
-        return {"diarization": diarization, "transcript": transcript}
+        return {"diarization": response, "transcript": transcript}
     except:
         return {"diarization": None, "transcript": ''}
 
