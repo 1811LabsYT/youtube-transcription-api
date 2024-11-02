@@ -34,7 +34,6 @@ async def transcribe_audio(audio_file, language):
             options = {
                 'model': 'nova-2',
                 'smart_format': True,
-                'diarize': True,
                 'punctuate': True,
                 'paragraphs': True,
             }
