@@ -158,7 +158,8 @@ def process_video_and_transcribe(video_url, note_id, language, callback_url=None
 
     except Exception as e:
         print(e)
-        error_data = {"note_id": note_id, "error": str(e)}
+        error_data = {"note_id": note_id,
+                      "transcript": "error", "error": str(e)}
         if callback_url:
             requests.post(callback_url, json=error_data)
         else:
